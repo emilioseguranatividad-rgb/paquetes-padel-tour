@@ -37,6 +37,9 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px);background:var(--night);c
 .busy{position:fixed;inset:0;z-index:75;background:rgba(10,26,53,.8);display:grid;place-items:center;font-family:var(--f-title);font-size:22px}
 .lnk{all:unset;cursor:pointer;color:var(--line);font-size:18px;text-decoration:underline;justify-self:center}
 .lnk:focus-visible{outline:3px solid var(--ball)}
+.ratz{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;background:var(--panel);padding:8px 12px;min-width:0}
+.ratz canvas{width:128px;height:auto}
+.niv{display:block;font-family:var(--f-body);font-size:17px;line-height:1.05;color:var(--muted)}
 .mesc{background:var(--panel);padding:8px 10px;display:grid;gap:2px;font-size:18px;color:var(--muted);line-height:1.15;min-width:0}
 .mesh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;color:var(--ink);font-family:var(--f-title);font-size:20px}
 .mesh .okk{color:var(--good);font-size:17px} .mesh .pend{color:var(--gold);font-size:17px}
@@ -442,6 +445,19 @@ function draw(c,id,pose,f,noGear){
  if(PATATA===id)POTATO(c,hy);
 }
 
+/* la rata de alcantarilla: 64×40. Despierta vigila la moneda; dormida, nadie debe nada */
+function drawRat(c,dorm,f){c.clearRect(0,0,64,40);const G='#6b7280',D='#4b5563',L='#9aa3b2',P='#f2a1b3',E='#141422',t=dorm?0:(f%4<2?0:1);
+ R(c,0,36,64,2,'rgba(0,0,0,.35)');
+ R(c,8,29+t,11,2,P);R(c,4,26+t,5,3,P);R(c,1,23-t,4,3,P);
+ blob(c,16,15,30,20,D);blob(c,17,15,27,18,G);blob(c,23,26,18,7,L);
+ R(c,22,33,6,3,P);R(c,38,33,6,3,P);
+ blob(c,40,12,15,15,G);R(c,53,18,6,6,G);R(c,58,19,3,3,P);
+ blob(c,42,7,8,8,D);blob(c,44,9,4,4,P);
+ if(dorm){R(c,48,17,4,1,E);if(f%8<5){R(c,56,6,4,1,'#eaf2ff');R(c,59,7,1,1,'#eaf2ff');R(c,57,8,1,1,'#eaf2ff');R(c,56,9,4,1,'#eaf2ff')}}
+ else{R(c,48,15,3,3,'#ff4d4d');R(c,48,15,1,1,'#fff');R(c,46,13,5,1,E)}
+ R(c,56,24,2,3,'#fff');for(const y of[20,23])R(c,60,y,4,1,'#c9d3e0');
+ if(!dorm){blob(c,42,25+t,9,9,'#f7bd2f');R(c,45,27+t,3,5,'#8a6410');R(c,44,28+t,3,1,'#8a6410');R(c,44,30+t,3,1,'#8a6410')}}
+
 /* cabezas para tablas */
 const HEADS={};
 function head(id){if(HEADS[id+PATATA])return HEADS[id+PATATA];
@@ -638,16 +654,24 @@ const pagadoMes=k=>pagosMes(k).reduce((s,x)=>s+x.e,0);
 const mesTxt=k=>MESL[+k.slice(5,7)-1];
 function vMes(){const ks=[...new Set([HOY.slice(0,7),...PISTAM.filter(x=>x.t==='adelanto').map(x=>x.d.slice(0,7))])].sort().reverse().slice(0,3);
  return ks.map(k=>{const c=costeMes(k),p=pagadoMes(k),q=pagosMes(k),ok=p>=c;return `<div class="mesc"><div class="mesh"><b>${mesTxt(k)}</b><span class="${ok?'okk':'pend'}">${ok?'Pagado':'Faltan '+eu(c-p)}</span></div><span>${eu(p)} de ${eu(c)} previstos</span><span>${q.length?q.map(x=>`${nm(x.de)} ${eu(x.e)}`).join(' · '):'Nadie ha pagado todavía.'}</span></div>`}).join('')}
-function vPista(){const s=saldoPista(),mov=[...PISTAM].sort((a,b)=>a.d<b.d?1:-1).slice(0,8),deud=s.some(r=>r.s<0);
+function morosos(){const t={},add=(id,k,v)=>{const r=t[id]=t[id]||{id,pista:0,bote:0,total:0};r[k]+=v;r.total+=v};
+ for(const r of saldoPista())if(r.s<0)add(r.id,'pista',-r.s);for(const r of deuda())if(r.deb>0)add(r.id,'bote',r.deb);
+ return Object.values(t).sort((a,b)=>b.total-a.total)}
+const nivel=e=>e>16?{t:'Rata de alcantarilla oficial',i:'🐀'}:e>8?{t:'Moroso reincidente',i:'💸'}:{t:'Despiste perdonable',i:'🧀'};
+const detalle=m=>[m.pista?'pista '+eu(m.pista):'',m.bote?'Bote '+eu(m.bote):''].filter(Boolean).join(' + ');
+function vMorosos(){const m=morosos();return `<section class="sec"><h2>Cuadro de morosos</h2>
+ ${m.length?`<div class="ratz"><canvas class="px" data-rat="caza" width="64" height="40" role="img" aria-label="Rata de alcantarilla vigilando la moneda"></canvas><p class="sub">La rata vigila. Las deudas de pista y Bote, juntas.</p></div>
+ <div>${m.map(x=>`<div class="deb">${himg(x.id)}<div class="nm">${nm(x.id)}<span class="niv">${nivel(x.total).t} · ${detalle(x)}</span></div><div class="eu">${eu(x.total)}</div><span></span></div>`).join('')}</div>
+ <button class="btn" type="button" id="recl">RECLAMAR POR WHATSAPP</button>`:`<div class="ratz"><canvas class="px" data-rat="dorm" width="64" height="40" role="img" aria-label="Rata de alcantarilla durmiendo"></canvas><p class="sub">Nadie debe nada. La rata duerme.</p></div>`}</section>`}
+function vPista(){const s=saldoPista(),mov=[...PISTAM].sort((a,b)=>a.d<b.d?1:-1).slice(0,8);
  return `<section class="sec"><h2>Pista</h2><p class="sub">${PISTA_PRECIO} € por jugador y partida, por adelantado el primer miércoles del mes.</p>
  <h3>Quién ha pagado el mes</h3><div class="plist">${vMes()}</div>
  <h3>Saldo de cada uno</h3><p class="sub">Lo que ha puesto menos lo que ha jugado desde noviembre. La app solo lo apunta: no mueve dinero.</p>
  ${s.length?`<div>${s.map(r=>`<div class="deb">${himg(r.id)}<div class="nm">${nm(r.id)}</div><div class="eu ${r.s<0?'':'ok'}">${r.s>0?'+':''}${eu(r.s)}</div><span></span></div>`).join('')}</div>`:'<p class="note">Sin movimientos. Apunta quién paga la pista de noviembre.</p>'}
  <div class="duo"><button class="btn alt" type="button" id="pmes">PAGO DEL MES</button><button class="btn alt" type="button" data-fp="bizum">BIZUM</button></div>
- ${deud?'<button class="btn" type="button" id="recl">RECLAMAR POR WHATSAPP</button>':''}
  ${mov.length?`<h3>Últimos movimientos</h3><div>${mov.map(x=>`<div class="mov"><span>${fd(x.d)}: ${x.t==='bizum'?`${nm(x.de)} a ${nm(x.a)}`:`${nm(x.de)} paga pista`}, ${eu(x.e)}${x.n?' · '+esc(x.n):''}</span><button class="mini" type="button" data-an="Pista" data-id="${x.rid}" data-tx="${fd(x.d)}: ${nm(x.de)}, ${eu(x.e)}">Anular</button></div>`).join('')}</div>`:''}</section>`}
 function vCaja(){const d=deuda().sort((a,b)=>b.deb-a.deb||a.id.localeCompare(b.id)),tot=charges().length,paid=sumPag();
- return `<section class="sec"><h2>El Bote</h2><p class="sub">Desde el miércoles 2 de diciembre, cada perdedor pone 1 € por partido. Perder el post no paga: ya tienen bastante. Nadie lleva efectivo, así que aquí queda apuntado. Con unas 35 partidas al año son unos 70 € para la cena.</p>
+ return `${vMorosos()}<section class="sec"><h2>El Bote</h2><p class="sub">Desde el miércoles 2 de diciembre, cada perdedor pone 1 € por partido. Perder el post no paga: ya tienen bastante. Nadie lleva efectivo, así que aquí queda apuntado. Con unas 35 partidas al año son unos 70 € para la cena.</p>
  <div class="stats"><div><b>${tot} €</b><span>generados</span></div><div><b>${paid} €</b><span>pagados</span></div><div><b>${tot-paid} €</b><span>pendientes</span></div></div>
  ${tot?'':'<p class="note">Todavía nadie debe nada. El primer euro cae el 2 de diciembre.</p>'}
  <div>${d.filter(r=>r.c.length||r.pag).map(r=>`<div class="deb">${himg(r.id)}<div class="nm">${nm(r.id)}</div><div class="eu ${r.deb<=0?'ok':''}">${r.deb} €</div><button class="mini" type="button" data-pay="${r.id}" data-e="${r.deb}"${r.deb<=0?' disabled':''}>Ha pagado</button><div class="hist">${[...r.c].reverse().map(c=>fd(c.d)).join(' · ')}${r.pag?` · pagados ${r.pag} €`:''}</div></div>`).join('')}</div>
@@ -661,7 +685,7 @@ function go(v){state.v=v;try{history.replaceState(null,'','#'+v)}catch(e){}rende
 
 /* animación */
 let frame=0;const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
-function paint(){document.querySelectorAll('canvas[data-sp]').forEach(cv=>draw(cv.getContext('2d'),cv.dataset.sp,cv.dataset.pose||'idle',frame+ +(cv.dataset.o||0)))}
+function paint(){document.querySelectorAll('canvas[data-sp]').forEach(cv=>draw(cv.getContext('2d'),cv.dataset.sp,cv.dataset.pose||'idle',frame+ +(cv.dataset.o||0)));document.querySelectorAll('canvas[data-rat]').forEach(cv=>drawRat(cv.getContext('2d'),cv.dataset.rat==='dorm',frame))}
 if(!still)setInterval(()=>{frame++;paint()},130);
 
 /* ficha */
@@ -768,7 +792,21 @@ function formPista(t){const bz=t==='bizum',P=[...ORDER,...guests()],opt=P.map(id
  <button class="btn" type="button" id="pOk">GUARDAR</button></div></div>`);
  document.getElementById('pOk').onclick=()=>{const v=id=>document.getElementById(id).value,e=parseFloat(v('pe').replace(',','.'));if(!(e>0))return toast('Revisa el importe');if(bz&&v('pde')===v('pa'))return toast('Elige dos personas distintas');
   op('pista',{t,d:v('pfd')||HOY,de:v('pde'),a:bz?v('pa'):'',e,n:v('pn')},()=>{closeLayer();render();toast('Apuntado')})}}
-function reclamo(){const d=saldoPista().filter(r=>r.s<0);return `🎾 La Caja del Paquetes Padel Tour informa:\n${d.map(r=>`💸 ${CAST[r.id].n} debe ${eu(-r.s)} de pista`).join('\n')}\nBizum y aquí paz.`}
+function reclamo(){return `🐀 CUADRO DE MOROSOS · Paquetes Padel Tour\n\n${morosos().map(x=>{const v=nivel(x.total);return `${v.i} ${CAST[x.id].n}: ${eu(x.total)} (${detalle(x)}). ${v.t}.`}).join('\n')}\n\nBizum y aquí paz.\nPaga, rata de alcantarilla.`}
+async function tarjetaMorosos(){await Promise.all(['40px "Press Start 2P"','700 40px "Pixelify Sans"'].map(f=>document.fonts.load(f))).catch(()=>{});
+ const S=1080,cv=document.createElement('canvas');cv.width=S;cv.height=S;const c=cv.getContext('2d');c.imageSmoothingEnabled=false;
+ c.fillStyle='#1d2a2b';c.fillRect(0,0,S,S);
+ for(let y=0;y<S;y+=60)for(let x=(y/60)%2?-60:0;x<S;x+=120){c.fillStyle=(x+y)%240?'#263637':'#2d3f3f';c.fillRect(x+3,y+3,114,54)}
+ c.strokeStyle='#d9f23a';c.lineWidth=16;c.strokeRect(30,30,S-60,S-60);
+ const txt=(s,x,y,f,col,al='center')=>{c.font=f;c.fillStyle=col;c.textAlign=al;c.fillText(s,x,y)};
+ txt('CUADRO DE MOROSOS',S/2,112,'44px "Press Start 2P",monospace','#d9f23a');txt('PAQUETES PADEL TOUR',S/2,166,'700 36px "Pixelify Sans",sans-serif','#eaf2ff');
+ const r=document.createElement('canvas');r.width=64;r.height=40;drawRat(r.getContext('2d'),false,1);c.drawImage(r,S/2-192,186,384,240);
+ const m=morosos(),vis=m.slice(0,4),t=document.createElement('canvas');t.width=W;t.height=H;const k=t.getContext('2d');let y=446;
+ for(const x of vis){draw(k,x.id,'lose',1);c.drawImage(t,86,y-6,96,120);txt(CAST[x.id].n,196,y+48,'700 44px "Pixelify Sans",sans-serif','#eaf2ff','left');txt(nivel(x.total).t,196,y+88,'700 30px "Pixelify Sans",sans-serif',x.total>16?'#ff6b6b':'#f7bd2f','left');txt(eu(x.total),S-86,y+66,'40px "Press Start 2P",monospace','#f7bd2f','right');y+=118}
+ if(m.length>4)txt(`y ${m.length-4} más`,S/2,y+6,'700 30px "Pixelify Sans",sans-serif','#eaf2ff');
+ txt('PAGA, RATA DE ALCANTARILLA',S/2,1012,'28px "Press Start 2P",monospace','#d9f23a');
+ return new Promise(res=>cv.toBlob(res,'image/png'))}
+async function reclamar(){try{const b=await tarjetaMorosos();window._card=b;await enviar(reclamo(),new File([b],'morosos-paquetes.png',{type:'image/png'}))}catch(e){await enviar(reclamo())}}
 async function enviar(text,file){const url=location.href.split('#')[0],t=url.startsWith('http')?text+'\n'+url:text;
  if(file&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],text:t})}catch(e){}return}
  if(!file&&navigator.share){try{await navigator.share({text:t})}catch(e){}return}
@@ -798,7 +836,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,rect');if
  if(t.id==='snd')return toggleTheme();
  if(t.id==='fab')return apuntar();
  if(t.id==='noinst'){store.set('ppt_noinst',true);return render()}
- if(t.id==='recl')return enviar(reclamo());
+ if(t.id==='recl')return reclamar();
  if(t.id==='pmes')return formMes();
  if(d.g){const id=d.g;if(PG.sel.includes(id)){PG.sel=PG.sel.filter(x=>x!==id);delete PG.imp[id]}else PG.sel.push(id);return formMes()}
  if(d.fp)return formPista(d.fp);
@@ -816,7 +854,7 @@ document.addEventListener('change',e=>{if(e.target.id==='per'){state.per=e.targe
 document.getElementById('fab').addEventListener('click',()=>{});
 window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(RENDER[v]&&v!==state.v)go(v)});
 const hv=location.hash.slice(1);if(RENDER[hv])state.v=hv;
-window.PPT={table,postTable,pairs,podium,streak,ALL,charges,seasonOf,saldoPista,test(u){API=u;LIVE=true;return load()},tarjeta};
+window.PPT={table,postTable,pairs,podium,streak,ALL,charges,seasonOf,saldoPista,morosos,reclamo,tarjetaMorosos,test(u){API=u;LIVE=true;return load()},tarjeta};
 const cc=store.get('ppt_cache',null);if(cc)try{apply(cc);lastJ=JSON.stringify(cc)}catch(e){}
 render();load();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)load()});
