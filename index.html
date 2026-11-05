@@ -654,8 +654,11 @@ const pagadoMes=k=>pagosMes(k).reduce((s,x)=>s+x.e,0);
 const mesTxt=k=>MESL[+k.slice(5,7)-1];
 function vMes(){const ks=[...new Set([HOY.slice(0,7),...PISTAM.filter(x=>x.t==='adelanto').map(x=>x.d.slice(0,7))])].sort().reverse().slice(0,3);
  return ks.map(k=>{const c=costeMes(k),p=pagadoMes(k),q=pagosMes(k),ok=p>=c;return `<div class="mesc"><div class="mesh"><b>${mesTxt(k)}</b><span class="${ok?'okk':'pend'}">${ok?'Pagado':'Faltan '+eu(c-p)}</span></div><span>${eu(p)} de ${eu(c)} previstos</span><span>${q.length?q.map(x=>`${nm(x.de)} ${eu(x.e)}`).join(' · '):'Nadie ha pagado todavía.'}</span></div>`}).join('')}
+/* Xepa y Ricardo adelantan el mes: entre ellos se ajustan, no con el grupo */
+const ADV=['xepa','ricardo'];
+function ajusteAdv(){const s=saldoPista(),x=s.find(r=>r.id==='xepa')?.s||0,r=s.find(q=>q.id==='ricardo')?.s||0;return {x,r}}
 function morosos(){const t={},add=(id,k,v)=>{const r=t[id]=t[id]||{id,pista:0,bote:0,total:0};r[k]+=v;r.total+=v};
- for(const r of saldoPista())if(r.s<0)add(r.id,'pista',-r.s);for(const r of deuda())if(r.deb>0)add(r.id,'bote',r.deb);
+ for(const r of saldoPista())if(r.s<0&&!ADV.includes(r.id))add(r.id,'pista',-r.s);for(const r of deuda())if(r.deb>0)add(r.id,'bote',r.deb);
  return Object.values(t).sort((a,b)=>b.total-a.total)}
 const nivel=e=>e>16?{t:'Rata de alcantarilla oficial',i:'🐀'}:e>8?{t:'Moroso reincidente',i:'💸'}:{t:'Despiste perdonable',i:'🧀'};
 const detalle=m=>[m.pista?'pista '+eu(m.pista):'',m.bote?'Bote '+eu(m.bote):''].filter(Boolean).join(' + ');
