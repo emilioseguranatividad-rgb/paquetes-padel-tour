@@ -37,6 +37,11 @@ body{margin:0;padding-top:env(safe-area-inset-top,0px);background:var(--night);c
 .busy{position:fixed;inset:0;z-index:75;background:rgba(10,26,53,.8);display:grid;place-items:center;font-family:var(--f-title);font-size:22px}
 .lnk{all:unset;cursor:pointer;color:var(--line);font-size:18px;text-decoration:underline;justify-self:center}
 .lnk:focus-visible{outline:3px solid var(--ball)}
+.mesc{background:var(--panel);padding:8px 10px;display:grid;gap:2px;font-size:18px;color:var(--muted);line-height:1.15;min-width:0}
+.mesh{display:flex;justify-content:space-between;gap:10px;align-items:baseline;color:var(--ink);font-family:var(--f-title);font-size:20px}
+.mesh .okk{color:var(--good);font-size:17px} .mesh .pend{color:var(--gold);font-size:17px}
+.imp{grid-template-columns:1fr 96px auto;align-items:center;font-family:var(--f-title);font-size:18px}
+.imp input{text-align:right;padding:7px 8px}
 #layer2{position:relative;z-index:70}
 #layer2 .ov{z-index:70}
 *{box-sizing:border-box}
@@ -626,10 +631,19 @@ function vPlantilla(){return `<section class="sec"><h2>Plantilla</h2><p class="s
 const eu=n=>String(Math.round(n*100)/100).replace('.',',')+' €';
 function saldoPista(){const t={},get=id=>t[id]=t[id]||{id,s:0};for(const m of ALL())if(m.d>=PISTA_DESDE)for(const id of[...m.a,...m.b])get(id).s-=PISTA_PRECIO;
  for(const x of PISTAM){get(x.de).s+=x.e;if(x.t==='bizum')get(x.a).s-=x.e}return Object.values(t).sort((a,b)=>a.s-b.s)}
+function miercoles(k){const[y,m]=k.split('-').map(Number),d=new Date(y,m-1,1),o=[];while(d.getMonth()===m-1){if(d.getDay()===3)o.push(iso(d));d.setDate(d.getDate()+1)}return o}
+const costeMes=k=>miercoles(k).length*4*PISTA_PRECIO;
+const pagosMes=k=>PISTAM.filter(x=>x.t==='adelanto'&&x.d.slice(0,7)===k);
+const pagadoMes=k=>pagosMes(k).reduce((s,x)=>s+x.e,0);
+const mesTxt=k=>MESL[+k.slice(5,7)-1];
+function vMes(){const ks=[...new Set([HOY.slice(0,7),...PISTAM.filter(x=>x.t==='adelanto').map(x=>x.d.slice(0,7))])].sort().reverse().slice(0,3);
+ return ks.map(k=>{const c=costeMes(k),p=pagadoMes(k),q=pagosMes(k),ok=p>=c;return `<div class="mesc"><div class="mesh"><b>${mesTxt(k)}</b><span class="${ok?'okk':'pend'}">${ok?'Pagado':'Faltan '+eu(c-p)}</span></div><span>${eu(p)} de ${eu(c)} previstos</span><span>${q.length?q.map(x=>`${nm(x.de)} ${eu(x.e)}`).join(' · '):'Nadie ha pagado todavía.'}</span></div>`}).join('')}
 function vPista(){const s=saldoPista(),mov=[...PISTAM].sort((a,b)=>a.d<b.d?1:-1).slice(0,8),deud=s.some(r=>r.s<0);
- return `<section class="sec"><h2>Pista</h2><p class="sub">${PISTA_PRECIO} € por jugador y partida. El saldo es lo que cada uno ha puesto menos lo que ha jugado desde noviembre. La app solo lo apunta: no mueve dinero.</p>
+ return `<section class="sec"><h2>Pista</h2><p class="sub">${PISTA_PRECIO} € por jugador y partida, por adelantado el primer miércoles del mes.</p>
+ <h3>Quién ha pagado el mes</h3><div class="plist">${vMes()}</div>
+ <h3>Saldo de cada uno</h3><p class="sub">Lo que ha puesto menos lo que ha jugado desde noviembre. La app solo lo apunta: no mueve dinero.</p>
  ${s.length?`<div>${s.map(r=>`<div class="deb">${himg(r.id)}<div class="nm">${nm(r.id)}</div><div class="eu ${r.s<0?'':'ok'}">${r.s>0?'+':''}${eu(r.s)}</div><span></span></div>`).join('')}</div>`:'<p class="note">Sin movimientos. Apunta quién paga la pista de noviembre.</p>'}
- <div class="duo"><button class="btn alt" type="button" data-fp="adelanto">PAGO DE PISTA</button><button class="btn alt" type="button" data-fp="bizum">BIZUM</button></div>
+ <div class="duo"><button class="btn alt" type="button" id="pmes">PAGO DEL MES</button><button class="btn alt" type="button" data-fp="bizum">BIZUM</button></div>
  ${deud?'<button class="btn" type="button" id="recl">RECLAMAR POR WHATSAPP</button>':''}
  ${mov.length?`<h3>Últimos movimientos</h3><div>${mov.map(x=>`<div class="mov"><span>${fd(x.d)}: ${x.t==='bizum'?`${nm(x.de)} a ${nm(x.a)}`:`${nm(x.de)} paga pista`}, ${eu(x.e)}${x.n?' · '+esc(x.n):''}</span><button class="mini" type="button" data-an="Pista" data-id="${x.rid}" data-tx="${fd(x.d)}: ${nm(x.de)}, ${eu(x.e)}">Anular</button></div>`).join('')}</div>`:''}</section>`}
 function vCaja(){const d=deuda().sort((a,b)=>b.deb-a.deb||a.id.localeCompare(b.id)),tot=charges().length,paid=sumPag();
@@ -717,11 +731,33 @@ function busy(on){let e=document.getElementById('busy');if(on&&!e){e=document.cr
 function askPin(fn,err){document.getElementById('layer2').innerHTML=`<div class="ov"><div class="inner"><div class="bar"><h2>PIN del grupo</h2><button class="close" type="button" id="pinx">CERRAR</button></div>${err?`<p style="color:var(--bad)">${err}</p>`:''}<p class="sub">Solo se pide la primera vez en este móvil.</p><input class="fld" id="pinI" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN"><button class="btn" type="button" id="pinOk">CONTINUAR</button></div></div>`;
  const close=()=>{document.getElementById('layer2').innerHTML=''};document.getElementById('pinx').onclick=close;document.getElementById('pinI').focus();
  document.getElementById('pinOk').onclick=()=>{const v=document.getElementById('pinI').value.trim();if(!v)return;store.set('ppt_pin',v);close();fn()}}
-async function send(accion,data){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({accion,pin:store.get('ppt_pin',''),...data})}),j=await r.json();if(j.error)throw new Error(j.error);await load();return j}
+async function send(accion,data,sinLoad){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({accion,pin:store.get('ppt_pin',''),...data})}),j=await r.json();if(j.error)throw new Error(j.error);if(!sinLoad)await load();return j}
 function op(accion,data,ok){if(!LIVE)return toast('Copia de prueba: no guarda nada.');if(!store.get('ppt_pin',''))return askPin(()=>op(accion,data,ok));
  busy(true);send(accion,data).then(()=>{busy(false);ok&&ok()},e=>{busy(false);if(e.message==='pin'){store.set('ppt_pin','');askPin(()=>op(accion,data,ok),'PIN incorrecto.')}else toast(e.message==='duplicada'?'Ese día ya tiene una partida apuntada.':e.message==='Failed to fetch'?'Sin conexión. Inténtalo de nuevo.':e.message)})}
+function opLista(accion,lista,ok){if(!LIVE)return toast('Copia de prueba: no guarda nada.');if(!store.get('ppt_pin',''))return askPin(()=>opLista(accion,lista,ok));
+ busy(true);(async()=>{for(const x of lista)await send(accion,x,true);await load()})().then(()=>{busy(false);ok&&ok()},e=>{busy(false);if(e.message==='pin'){store.set('ppt_pin','');askPin(()=>opLista(accion,lista,ok),'PIN incorrecto.')}else{load();toast(e.message==='Failed to fetch'?'Sin conexión. Revisa qué se ha guardado.':e.message)}})}
 function pedirAnular(hoja,id,tx){layer(`<div class="ov"><div class="inner"><div class="bar"><h2>Anular</h2><button class="close" type="button" data-close>CERRAR</button></div><p>${tx}</p><p class="sub">Desaparece de la app para todos. En el Google Sheet queda marcado como anulado.</p><button class="btn" type="button" id="anOk">ANULAR</button></div></div>`);
  document.getElementById('anOk').onclick=()=>op('anular',{hoja,id},()=>{closeLayer();render();toast('Anulado')})}
+/* pago del mes: varias personas a la vez, cada una con su importe */
+const PG={mes:null,sel:[],imp:{}};
+function mesesPago(){const d=new Date(),o=[];for(const i of[-1,0,1]){const x=new Date(d.getFullYear(),d.getMonth()+i,1),k=iso(x).slice(0,7);if(k>=PISTA_DESDE.slice(0,7))o.push(k)}return o}
+function repartoMes(){const rest=Math.max(costeMes(PG.mes)-pagadoMes(PG.mes),0),n=PG.sel.length;return n?Math.round(rest/n*100)/100:0}
+const impDe=id=>id in PG.imp?PG.imp[id]:repartoMes();
+function formMes(){if(!PG.mes)PG.mes=HOY.slice(0,7);const k=PG.mes,w=miercoles(k).length,c=costeMes(k),p=pagadoMes(k);
+ const P=[...ORDER,...guests()],suma=PG.sel.reduce((s,id)=>s+(parseFloat(String(impDe(id)).replace(',','.'))||0),0);
+ layer(`<div class="ov"><div class="inner"><div class="bar"><h2>Pago del mes</h2><button class="close" type="button" data-close>CERRAR</button></div>
+ <div class="formg"><label class="sub" for="mesSel">Mes</label><select id="mesSel">${mesesPago().map(m=>`<option value="${m}"${m===k?' selected':''}>${mesTxt(m)} ${m.slice(0,4)}</option>`).join('')}</select></div>
+ <p class="note">${w} miércoles × 4 jugadores × ${PISTA_PRECIO} € = ${eu(c)}.${p?` Ya apuntado: ${eu(p)}.`:''}</p>
+ <p class="sub">Toca a quién ha pagado. La app reparte el total y puedes cambiar cada importe.</p>
+ <div class="pick">${P.map(id=>`<button type="button" data-g="${id}" data-t="${PG.sel.includes(id)?'a':''}" aria-pressed="${PG.sel.includes(id)}">${himg(id,'')}${nm(id)}</button>`).join('')}</div>
+ ${PG.sel.map(id=>`<div class="formg imp"><label for="imp-${id}">${nm(id)}</label><input class="fld" id="imp-${id}" data-imp="${id}" type="text" inputmode="decimal" value="${String(impDe(id)).replace('.',',')}" aria-label="Importe de ${nm(id)} en euros"><span>€</span></div>`).join('')}
+ ${PG.sel.length?`<p class="sub" id="pgsum">Total a apuntar: ${eu(suma)}</p>`:''}
+ <button class="btn" type="button" id="pgOk"${PG.sel.length?'':' disabled'}>GUARDAR PAGO</button></div></div>`);
+ document.getElementById('mesSel').onchange=e=>{PG.mes=e.target.value;PG.imp={};formMes()};
+ document.querySelectorAll('[data-imp]').forEach(i=>i.oninput=()=>{PG.imp[i.dataset.imp]=i.value;const t=PG.sel.reduce((s,id)=>s+(parseFloat(String(impDe(id)).replace(',','.'))||0),0);document.getElementById('pgsum').textContent='Total a apuntar: '+eu(t)});
+ document.getElementById('pgOk').onclick=()=>{const dia=HOY.slice(0,7)===k?HOY:miercoles(k)[0],lista=PG.sel.map(id=>({t:'adelanto',d:dia,de:CAST[id].n,a:'',e:parseFloat(String(impDe(id)).replace(',','.')),n:'Pista de '+mesTxt(k).toLowerCase()}));
+  if(lista.some(x=>!(x.e>0)))return toast('Revisa los importes');
+  opLista('pista',lista,()=>{Object.assign(PG,{mes:null,sel:[],imp:{}});closeLayer();render();sfx.coin();toast('Pago apuntado')})}}
 function formPista(t){const bz=t==='bizum',P=[...ORDER,...guests()],opt=P.map(id=>`<option value="${CAST[id].n}">${CAST[id].n}</option>`).join('');
  layer(`<div class="ov"><div class="inner"><div class="bar"><h2>${bz?'Apuntar Bizum':'Pago de pista'}</h2><button class="close" type="button" data-close>CERRAR</button></div>
  <div class="formg"><label class="sub" for="pfd">Fecha</label><input class="fld" id="pfd" type="date" value="${HOY}"></div>
@@ -763,6 +799,8 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,rect');if
  if(t.id==='fab')return apuntar();
  if(t.id==='noinst'){store.set('ppt_noinst',true);return render()}
  if(t.id==='recl')return enviar(reclamo());
+ if(t.id==='pmes')return formMes();
+ if(d.g){const id=d.g;if(PG.sel.includes(id)){PG.sel=PG.sel.filter(x=>x!==id);delete PG.imp[id]}else PG.sel.push(id);return formMes()}
  if(d.fp)return formPista(d.fp);
  if(d.an)return pedirAnular(d.an,d.id,d.tx||'');
  if(d.tab){state.tab=d.tab;return render()}
