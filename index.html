@@ -254,7 +254,7 @@ const HIST={
 };
 const BOTE_DESDE='2026-12-01',PISTA_DESDE='2026-11-01',PISTA_PRECIO=8;
 /* Dirección del Google Sheet (aplicación web de Apps Script). Vacía = copia de prueba. */
-let API='https://script.google.com/macros/s/AKfycby2ZIhWWODUf6EqtmjoP1NQHNqyB9wxBLQumfeA_mrWUWMZU_ShtcrQWiJ2YYvuv8Hb/exec';
+let API='https://script.google.com/macros/s/AKfycby_zL0LEqNTxTdvu5AMaWHjQM7gsqQFcs6Wjrk3ZEMVGAW2WjCcZ00rqsArR-KbA2iX/exec';
 let LIVE=API!=='';
 
 /* ===== PERSONAJES ===== */
@@ -505,7 +505,7 @@ function toggleTheme(){themeOn=!themeOn;if(themeOn){ctx();theme()}else clearTime
 const MEM={};
 const store={get(k,d){if(k in MEM)return MEM[k];try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){MEM[k]=v;try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 let BASE=RAW.map(r=>({d:r[0],a:[r[1],r[2]],b:[r[3],r[4]],w:r[5],p:r[6]==='0'?null:r[6]}));
-let PAGOS=[],PISTAM=[];
+let PAGOS=[],PISTAM=[],INC=[];
 const ALL=()=>[...BASE].sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:0);
 const sumPag=()=>PAGOS.reduce((s,p)=>s+p.e,0);
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -515,7 +515,7 @@ const guests=()=>Object.keys(CAST).filter(i=>!ORDER.includes(i)&&i!=='dino');
 function apply(j){
  BASE=j.partidas.filter(p=>p.w).map(p=>({id:p.id,d:p.d,a:[ensure(p.a1),ensure(p.a2)],b:[ensure(p.b1),ensure(p.b2)],w:p.w,p:p.p||null,r:p.r||null}));
  PAGOS=j.pagos.map(p=>({id:ensure(p.j),e:+p.e,d:p.d,rid:p.id}));
- PISTAM=j.pista.map(x=>({rid:x.id,d:x.d,t:x.t,de:ensure(x.de),a:x.a?ensure(x.a):null,e:+x.e,n:x.n||''}))}
+ PISTAM=j.pista.map(x=>({rid:x.id,d:x.d,t:x.t,de:ensure(x.de),a:x.a?ensure(x.a):null,e:+x.e,n:x.n||''}));INC=(j.incidencias||[]).map(x=>({id:x.id,d:x.d,adv:x.adv.map(n=>ensure(n)),e:+x.e,n:x.n||''}))}
 const seasonOf=d=>{const y=+d.slice(0,4),m=+d.slice(5,7);const s=m>=9?y:y-1;return s+'-'+String(s+1).slice(2)};
 const tOf=d=>{const m=+d.slice(5,7);return m>=9?'T1':m<=3?'T2':'T3'};
 const TN={T1:'sep–dic',T2:'ene–mar',T3:'abr–jul'};
@@ -679,8 +679,31 @@ function vPista(){const s=saldoPista(),mov=[...PISTAM].sort((a,b)=>a.d<b.d?1:-1)
  ${s.length?`<div>${s.map(r=>{const fp=ADV.includes(r.id)?fondoPend(r.id):0;return `<div class="deb">${himg(r.id)}<div class="nm">${nm(r.id)}${ADV.includes(r.id)?`<span class="niv">Fondo por recuperar de invitados: ${eu(fp)}<br>Su mes pagado y sin jugar: ${eu(r.s-fp)}</span>`:''}</div><div class="eu ${r.s<0?'':'ok'}">${r.s>0?'+':''}${eu(r.s)}</div><span></span></div>`}).join('')}</div>`:'<p class="note">Sin movimientos. Apunta quién paga la pista de noviembre.</p>'}
  <div class="duo"><button class="btn alt" type="button" id="pmes">PAGO DEL MES</button><button class="btn alt" type="button" data-fp="bizum">BIZUM</button></div>
  ${mov.length?`<h3>Últimos movimientos</h3><div>${mov.map(x=>`<div class="mov"><span>${fd(x.d)}: ${x.t==='bizum'?`${nm(x.de)} a ${nm(x.a)}`:`${nm(x.de)} paga pista`}, ${eu(x.e)}${x.n?' · '+esc(x.n):''}</span><button class="mini" type="button" data-an="Pista" data-id="${x.rid}" data-tx="${fd(x.d)}: ${nm(x.de)}, ${eu(x.e)}">Anular</button></div>`).join('')}</div>`:''}</section>`}
+/* Bonos: partida cancelada que queda a favor de los adelantados; se cobra 8 € por invitado y adelantado */
+function restanteBono(b,a){const usado=PISTAM.filter(x=>x.t==='bizum'&&x.a===a&&x.n==='BONO '+b.id).reduce((s,x)=>s+x.e,0);return Math.max(Math.round((b.e-usado)*100)/100,0)}
+function vBonos(){return `<section class="sec"><h2>Bonos</h2><p class="sub">Partida cancelada que queda como bono a favor de quien adelantó el mes. Cada invitado que juegue un bono paga 8 € a cada adelantado.</p>
+ ${INC.length?INC.map(b=>`<div class="mesc"><div class="mesh"><b>Bono del ${fd(b.d)}</b><span>${b.adv.map(nm).join(' y ')}</span></div><span>Queda por cobrar: ${b.adv.map(a=>`${nm(a)} ${eu(restanteBono(b,a))}`).join(' · ')}</span>${b.n?`<span>${esc(b.n)}</span>`:''}<div class="duo"><button class="mini" type="button" data-usebono="${b.id}">Usar bono</button><button class="mini" type="button" data-an="Incidencias" data-id="${b.id}" data-tx="Bono del ${fd(b.d)}">Anular</button></div></div>`).join(''):'<p class="note">No hay bonos pendientes.</p>'}
+ <button class="btn alt" type="button" id="nuevoBono">REGISTRAR PARTIDA CANCELADA</button></section>`}
+function formIncidencia(){layer(`<div class="ov"><div class="inner"><div class="bar"><h2>Partida cancelada</h2><button class="close" type="button" data-close>CERRAR</button></div>
+ <div class="formg"><label class="sub" for="bfd">Fecha de la partida cancelada</label><input class="fld" id="bfd" type="date" value="2026-11-11"></div>
+ <div class="formg"><label class="sub" for="bin">Invitados que la iban a jugar</label><input class="fld" id="bin" type="text" inputmode="numeric" value="2"></div>
+ <p class="sub">Quedan 8 € por invitado para cada adelantado: ${nm('xepa')} y ${nm('ricardo')}.</p>
+ <button class="btn" type="button" id="bOk">GUARDAR BONO</button></div></div>`);
+ document.getElementById('bOk').onclick=()=>{const d=document.getElementById('bfd').value,n=parseInt(document.getElementById('bin').value,10);if(!d)return toast('Pon la fecha');if(!(n>0&&n<=4))return toast('Revisa los invitados');
+  op('incidencia',{d,adv:ADV.map(id=>CAST[id].n).join(','),e:8*n,n:'Partida cancelada: '+n+' invitado'+(n>1?'s':'')},()=>{closeLayer();render();toast('Bono apuntado')})}}
+const BU={id:null,sel:[]};
+function formUsoBono(id){const b=INC.find(x=>x.id===id);if(!b)return;if(BU.id!==id){BU.id=id;BU.sel=[]}
+ const G=[...ORDER,...guests()].filter(p=>!ADV.includes(p));
+ layer(`<div class="ov"><div class="inner"><div class="bar"><h2>Usar bono del ${fd(b.d)}</h2><button class="close" type="button" data-close>CERRAR</button></div>
+ <div class="formg"><label class="sub" for="ufd">Fecha de la partida</label><input class="fld" id="ufd" type="date" value="${HOY}"></div>
+ <p class="sub">Toca los que juegan. Cada uno paga 8 € a ${b.adv.map(nm).join(' y ')}.</p>
+ <div class="pick">${G.map(p=>`<button type="button" data-ub="${p}" aria-pressed="${BU.sel.includes(p)}" data-t="${BU.sel.includes(p)?'a':''}">${himg(p,'')}${nm(p)}</button>`).join('')}</div>
+ <p class="sub">Quedan por cobrar: ${b.adv.map(a=>`${nm(a)} ${eu(restanteBono(b,a))}`).join(' · ')}</p>
+ <button class="btn" type="button" id="ubOk"${BU.sel.length?'':' disabled'}>GUARDAR USO DEL BONO</button></div></div>`);
+ document.getElementById('ubOk').onclick=()=>{const d=document.getElementById('ufd').value||HOY,lista=[];for(const p of BU.sel)for(const a of b.adv)lista.push({t:'bizum',d,de:CAST[p].n,a:CAST[a].n,e:8,n:'BONO '+b.id});
+  opLista('pista',lista,()=>{BU.id=null;BU.sel=[];closeLayer();render();sfx.coin();toast('Bono usado')})}}
 function vCaja(){const d=deuda().sort((a,b)=>b.deb-a.deb||a.id.localeCompare(b.id)),tot=charges().length,paid=sumPag();
- return `${vMorosos()}<section class="sec"><h2>El Bote</h2><p class="sub">Desde el miércoles 2 de diciembre, cada perdedor pone 1 € por partido. Perder el post no paga: ya tienen bastante. Nadie lleva efectivo, así que aquí queda apuntado. Con unas 35 partidas al año son unos 70 € para la cena.</p>
+ return `${vMorosos()}${vBonos()}<section class="sec"><h2>El Bote</h2><p class="sub">Desde el miércoles 2 de diciembre, cada perdedor pone 1 € por partido. Perder el post no paga: ya tienen bastante. Nadie lleva efectivo, así que aquí queda apuntado. Con unas 35 partidas al año son unos 70 € para la cena.</p>
  <div class="stats"><div><b>${tot} €</b><span>generados</span></div><div><b>${paid} €</b><span>pagados</span></div><div><b>${tot-paid} €</b><span>pendientes</span></div></div>
  ${tot?'':'<p class="note">Todavía nadie debe nada. El primer euro cae el 2 de diciembre.</p>'}
  <div>${d.filter(r=>r.c.length||r.pag).map(r=>`<div class="deb">${himg(r.id)}<div class="nm">${nm(r.id)}</div><div class="eu ${r.deb<=0?'ok':''}">${r.deb} €</div><button class="mini" type="button" data-pay="${r.id}" data-e="${r.deb}"${r.deb<=0?' disabled':''}>Ha pagado</button><div class="hist">${[...r.c].reverse().map(c=>fd(c.d)).join(' · ')}${r.pag?` · pagados ${r.pag} €`:''}</div></div>`).join('')}</div>
@@ -845,6 +868,9 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,rect');if
  if(t.id==='snd')return toggleTheme();
  if(t.id==='fab')return apuntar();
  if(t.id==='noinst'){store.set('ppt_noinst',true);return render()}
+ if(t.id==='nuevoBono')return formIncidencia();
+ if(d.usebono)return formUsoBono(d.usebono);
+ if(d.ub){const p=d.ub;BU.sel=BU.sel.includes(p)?BU.sel.filter(x=>x!==p):[...BU.sel,p];return formUsoBono(BU.id)}
  if(t.id==='recl')return reclamar();
  if(t.id==='pmes')return formMes();
  if(d.g){const id=d.g;if(PG.sel.includes(id)){PG.sel=PG.sel.filter(x=>x!==id);delete PG.imp[id]}else PG.sel.push(id);return formMes()}
