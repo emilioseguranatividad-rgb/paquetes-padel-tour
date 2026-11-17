@@ -702,6 +702,26 @@ function formUsoBono(id){const b=INC.find(x=>x.id===id);if(!b)return;if(BU.id!==
  <button class="btn" type="button" id="ubOk"${BU.sel.length?'':' disabled'}>GUARDAR USO DEL BONO</button></div></div>`);
  document.getElementById('ubOk').onclick=()=>{const d=document.getElementById('ufd').value||HOY,lista=[];for(const p of BU.sel)for(const a of b.adv)lista.push({t:'bizum',d,de:CAST[p].n,a:CAST[a].n,e:8,n:'BONO '+b.id});
   opLista('pista',lista,()=>{BU.id=null;BU.sel=[];closeLayer();render();sfx.coin();toast('Bono usado')})}}
+/* Uso del bono v2: jugadores (con nombre o sin nombre) y reparto de pagos a los adelantados */
+const BU2={id:null,sel:[],vir:0};
+function pagosBono(jug,advs){const sl=advs.flatMap(a=>[a,a]);if(jug.length===2)return jug.flatMap(p=>advs.map(a=>[p,a]));return jug.map((p,i)=>[p,sl[i%sl.length]])}
+function formUso(id){const b=INC.find(x=>x.id===id);if(!b)return;if(BU2.id!==id){BU2.id=id;BU2.sel=[];BU2.vir=0}
+ const G=[...new Set([...ORDER,'dino',...guests()])];
+ const vir=Array.from({length:BU2.vir},(_,i)=>'inv'+(i+1));
+ vir.forEach((v,i)=>{if(!CAST[v])CAST[v]={n:'Invitado '+(i+1),m:'Invitado',q:'',col:'#a9bfdd',skin:'#eebf98',shirt:'#64748b',shorts:'#334155',arm:'#64748b',win:[''],lose:['']}});
+ const jug=[...BU2.sel.filter(p=>!ADV.includes(p)),...vir],pagos=pagosBono(jug,b.adv);
+ const quedan=b.adv.map(a=>{const pa=pagos.filter(x=>x[1]===a).length*PISTA_PRECIO;return `${nm(a)} ${eu(Math.max(restanteBono(b,a)-pa,0))}`}).join(' · ');
+ layer(`<div class="ov"><div class="inner"><div class="bar"><h2>Usar bono del ${fd(b.d)}</h2><button class="close" type="button" data-close>CERRAR</button></div>
+ <div class="formg"><label class="sub" for="ufd">Fecha de la partida</label><input class="fld" id="ufd" type="date" value="${HOY}"></div>
+ <p class="sub">Toca quién juega. Si juegan ${b.adv.map(nm).join(' y ')}, no pagan ellos.</p>
+ <div class="pick">${G.map(p=>`<button type="button" data-ub="${p}" aria-pressed="${BU2.sel.includes(p)}" data-t="${BU2.sel.includes(p)?'a':''}">${himg(p,'')}${nm(p)}</button>`).join('')}</div>
+ <div class="formg"><label class="sub" for="uvir">Invitados sin nombre que juegan</label><input class="fld" id="uvir" type="text" inputmode="numeric" value="${BU2.vir}"></div>
+ ${pagos.length?`<h3>Pagos</h3><div>${pagos.map(([p,a])=>`<div class="mov"><span>${nm(p)} paga a ${nm(a)}</span><span>${eu(PISTA_PRECIO)}</span></div>`).join('')}</div>`:''}
+ <p class="sub">Quedan por cobrar: ${quedan}</p>
+ <button class="btn" type="button" id="ubOk"${jug.length?'':' disabled'}>GUARDAR USO DEL BONO</button></div></div>`);
+ document.getElementById('uvir').onchange=e=>{const v=parseInt(e.target.value,10);BU2.vir=Math.min(Math.max(isNaN(v)?0:v,0),4);formUso(id)};
+ document.getElementById('ubOk').onclick=()=>{const d=document.getElementById('ufd').value||HOY,lista=pagos.map(([p,a])=>({t:'bizum',d,de:CAST[p].n,a:CAST[a].n,e:PISTA_PRECIO,n:'BONO '+b.id}));
+  opLista('pista',lista,()=>{BU2.id=null;BU2.sel=[];BU2.vir=0;closeLayer();render();sfx.coin();toast('Bono usado')})}}
 function vCaja(){const d=deuda().sort((a,b)=>b.deb-a.deb||a.id.localeCompare(b.id)),tot=charges().length,paid=sumPag();
  return `${vMorosos()}${vBonos()}<section class="sec"><h2>El Bote</h2><p class="sub">Desde el miércoles 2 de diciembre, cada perdedor pone 1 € por partido. Perder el post no paga: ya tienen bastante. Nadie lleva efectivo, así que aquí queda apuntado. Con unas 35 partidas al año son unos 70 € para la cena.</p>
  <div class="stats"><div><b>${tot} €</b><span>generados</span></div><div><b>${paid} €</b><span>pagados</span></div><div><b>${tot-paid} €</b><span>pendientes</span></div></div>
@@ -869,8 +889,8 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,rect');if
  if(t.id==='fab')return apuntar();
  if(t.id==='noinst'){store.set('ppt_noinst',true);return render()}
  if(t.id==='nuevoBono')return formIncidencia();
- if(d.usebono)return formUsoBono(d.usebono);
- if(d.ub){const p=d.ub;BU.sel=BU.sel.includes(p)?BU.sel.filter(x=>x!==p):[...BU.sel,p];return formUsoBono(BU.id)}
+ if(d.usebono)return formUso(d.usebono);
+ if(d.ub){const p=d.ub;BU2.sel=BU2.sel.includes(p)?BU2.sel.filter(x=>x!==p):[...BU2.sel,p];return formUso(BU2.id)}
  if(t.id==='recl')return reclamar();
  if(t.id==='pmes')return formMes();
  if(d.g){const id=d.g;if(PG.sel.includes(id)){PG.sel=PG.sel.filter(x=>x!==id);delete PG.imp[id]}else PG.sel.push(id);return formMes()}
